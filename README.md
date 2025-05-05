@@ -1,11 +1,19 @@
 # aws2-ECS-Fargate
 Amazon ECS (Elastic Container Service) — a fully managed container orchestration service by AWS
 ![image](https://github.com/user-attachments/assets/54bab812-4312-4371-a88b-2233b63d7c82)
+![image](https://github.com/user-attachments/assets/9713c922-9b77-43d0-a5f0-e29565d48d9b)
+![image](https://github.com/user-attachments/assets/be678ea0-18a0-4130-8f72-6d69a604dbfd)
+![image](https://github.com/user-attachments/assets/7844e14e-2ae8-4c59-ad34-6bfaa16aeb75)
+
+
+
+
 
 
 **AWS ECS:**
 
 In this guide, we will deep dive into **Amazon ECS (Elastic Container Service)** — a fully managed container orchestration service by AWS. This article covers theoretical concepts, practical insights, architecture comparisons, real-world use cases, a step-by-step deployment guide, and interview-focused discussions.
+![image](https://github.com/user-attachments/assets/b405e141-9fc2-4cd5-bd87-5b2712fd3afc)
 
 **Table of Contents**
 
@@ -32,6 +40,19 @@ ________________________________________
 **Introduction**
 
 **Amazon ECS** is a container orchestration platform developed by AWS that allows you to easily run, scale, and secure Docker containers on the AWS cloud. Unlike Kubernetes-based systems such as Amazon EKS, ECS is proprietary and tightly coupled with the AWS ecosystem.
+
+An ECS cluster refers to a group of resources that Amazon ECS (Elastic Container Service) manages for running containerized applications. It's the core unit where ECS places and manages tasks and services.
+
+Key Concepts of an ECS Cluster:
+Definition:
+
+An ECS cluster is a logical grouping of tasks or services.
+
+You can run it using either:
+
+**Fargate:** serverless compute—no need to manage infrastructure.
+
+**EC2:** you manage the instances (virtual machines) yourself
 
 This article not only introduces ECS and its architecture but also demonstrates how to deploy a simple Flask-based containerized application using **AWS Fargate** — a serverless compute engine for containers.
 ________________________________________
@@ -137,11 +158,14 @@ Here are the key ECS components and their roles:
 
 •	**Cluster**: Logical grouping of tasks and services
 
-•	**Task Definition**: Blueprint for your container (image, ports, CPU/memory, env variables)
+•	**Task Definition**: Blueprint for your container (image, ports, CPU/memory, env variables,volume)
+     you can run multiple tasks using one task definition
 
 •	**Task**: Running instance of a task definition
 
 •	**Service**: Defines long-running tasks, integrates with load balancers, enables auto scaling
+   ECSservice wil spin up the task when it goes down
+   ECSservice will maintain ECS Tasks
 ________________________________________
 **Deploying Your First ECS Application (Using Fargate)**
 
@@ -240,3 +264,38 @@ Conclusion
 Amazon ECS is a powerful yet simple container orchestration solution tailored for AWS users. While it may not offer the extensive features and flexibility of Kubernetes, it provides a great entry point for teams seeking quick and hassle-free container deployments.
 
 However, for long-term scalability, portability, and ecosystem compatibility, Kubernetes (EKS) remains the go-to platform for most enterprises.
+
+Project
+Micro service(spring boot) -->Create docker image-->push docker imge to ECR-->Run image in ECS
+Above spring boot 3 it supports only java 17
+
+
+![image](https://github.com/user-attachments/assets/f3c41ea2-0733-4afe-8690-dfd71e9e1f42)
+We have to create  ajar file
+```
+FROM openjdk:17-alpine
+VOLUME /tmp
+COPY target/docker-example-microservice-0.0.1-SNAPSHOT.jar docker-example.jar
+ENTRYPOINT ["java","-Djava.security.egd=file:/dev/./urandom","-jar","/docker-example.jar"]
+
+Push the image to ECR repository
+you can enable kms key for encryption for docker image or else it uses default
+
+Scan on push---?vulnerability scanning
+Enable scan on push to have each image automatically scanned after being pushed to a repository. If disabled, each image scan must be manually started to get scan results.
+```
+Have access key and secret for uploading docker image
+you need to login to docker ECR to upload images
+```
+🔐 Docker ECR Authentication
+The Docker ECR login is handled like this:
+#aws ecr get-login-password --region <your-region> | docker login --username AWS --password-stdin <aws_account_id>.dkr.ecr.<your-region>.amazonaws.com
+Explanation:
+aws ecr get-login-password: This generates a temporary password (an authentication token) valid for 12 hours.
+
+--username AWS: This is a fixed value — always use AWS as the username for ECR.
+
+--password-stdin: Securely passes the password/token to Docker via standard input.
+
+You never need to manually retrieve or manage a username or password. AWS manages that securely through the CLI.
+
