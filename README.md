@@ -5,6 +5,7 @@ Amazon ECS (Elastic Container Service) — a fully managed container orchestrati
 ![image](https://github.com/user-attachments/assets/be678ea0-18a0-4130-8f72-6d69a604dbfd)
 ![image](https://github.com/user-attachments/assets/7844e14e-2ae8-4c59-ad34-6bfaa16aeb75)
 
+![image](https://github.com/user-attachments/assets/e08d448b-01b3-4681-a2d3-b2d3df83f6e4)
 
 
 
@@ -299,3 +300,94 @@ aws ecr get-login-password: This generates a temporary password (an authenticati
 
 You never need to manually retrieve or manage a username or password. AWS manages that securely through the CLI.
 
+once docker image is pushed to ECR
+go to ECS
+cluster-->create cluster-->give cluster name
+Networking-->select vpc, you can select subnets
+you can select type of cluster Extternal instances using ecs anywhere/AWS fargate/Amazaon ec2 instances
+create autoscaling group
+
+Monitoring
+Eanble use container insights
+CloudWatch automatically collects metrics for many resources, such as CPU, memory, disk, and network. Container Insights also provides diagnostic information, such as container restart failures, that you use to isolate issues and resolve them quickly. You can also set CloudWatch alarms on metrics that Container Insights collects.
+
+done
+
+Go to Task Definitions--?Create  a TASK definition
+Task Definition Family - <give name of task definition>
+you can run multiple containers with single task definition
+you can add environment variables/ give a file which contains all
+you can add health checks
+
+you need to create a task role.if your service is accessing other service then we ned a role for that
+enable log collection
+
+A Task Execution Role for Amazon ECS (Elastic Container Service) is an IAM role that grants ECS tasks the permissions they need to pull container images from Amazon ECR (Elastic Container Registry) and to write logs to Amazon CloudWatch.
+
+▸ Service auto scaling - optional
+Automatically adjust your service's deseed count up and down within a specified range in response to CloudWatch alarms. You can modify your service auto scaling configuration at any time to meet the needs of your application.
+you can also select loadbalancing group
+
+Here's how to create a typical Task Execution Role for ECS with ECR access:
+
+✅ 1. Create the IAM Role (via Console or CLI)
+You can name it something like ecsTaskExecutionRole.
+
+✅ 2. Attach the Required Trust Relationship
+This allows ECS tasks to assume the role:
+
+json
+Copy
+Edit
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+✅ 3. Attach the Required IAM Policies
+Use the managed policy AmazonECSTaskExecutionRolePolicy. This grants permissions to:
+
+Pull container images from ECR
+
+Write logs to CloudWatch Logs
+
+Access secrets from AWS Secrets Manager or SSM (if configured)
+
+bash
+Copy
+Edit
+aws iam attach-role-policy \
+  --role-name ecsTaskExecutionRole \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+This includes permissions like:
+
+json
+Copy
+Edit
+{
+  "Effect": "Allow",
+  "Action": [
+    "ecr:GetAuthorizationToken",
+    "ecr:BatchCheckLayerAvailability",
+    "ecr:GetDownloadUrlForLayer",
+    "ecr:BatchGetImage",
+    "logs:CreateLogStream",
+    "logs:PutLogEvents"
+  ],
+  "Resource": "*"
+}
+✅ 4. Reference the Role in Your Task Definition
+In the ECS task definition JSON/YAML:
+
+json
+Copy
+Edit
+"executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole"
+This is separate from the taskRoleArn, which gives the container runtime access to AWS services.
