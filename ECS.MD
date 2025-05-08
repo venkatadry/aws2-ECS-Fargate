@@ -37,6 +37,10 @@
 ### **4. Task**  
 - **Single running instance** of a **Task Definition**.  
 - If a task fails, ECS **automatically replaces it**.  
+Scheduler takes care of where the container should be launced
+ECS agent running on each EC2 will talk to ECS service
+when any task is down ECS agent will talk to ECS service .so ecs service will launch another task
+
 
 ### **5. Service**  
 - Ensures **long-running tasks** (e.g., web servers).  
