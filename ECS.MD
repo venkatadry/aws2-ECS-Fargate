@@ -35,6 +35,7 @@
 - Can define **one or more containers** (logically grouped).  
 
 ### **4. Task**  
+
 - **Single running instance** of a **Task Definition**.  
 - If a task fails, ECS **automatically replaces it**.  
 Scheduler takes care of where the container should be launced
