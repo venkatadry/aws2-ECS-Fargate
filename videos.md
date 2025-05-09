@@ -224,3 +224,180 @@ Here are the key notes from your explanation about the CloudFormation stack crea
 - Use the ECS console or CloudFormation events to track creation progress.  
 
 Let me know if you'd like a diagram or further clarification!
+
+**section 1.4**
+
+### **AWS ECS Task Definition Notes**  
+
+#### **Overview**  
+- A **task definition** is a template for running containers in **AWS ECS**.  
+- A **task** is an instance of a task definition (running containers).  
+- A single task can run **one or more containers**.  
+
+---
+
+### **Task Definition Configuration Parameters**  
+
+#### **1. Infrastructure Requirements**  
+- **Task Family (Name & Version)** – Identifies the task definition.  
+- **Launch Type** – Specifies how tasks run:  
+  - **EC2** (on EC2 instances)  
+  - **Fargate** (serverless)  
+  - **External** (requires an ECS cluster)  
+- **Operating System** – Linux (x86_64 or ARM) or Windows.  
+- **Networking Mode** – Options:  
+  - **AWS VPC** (recommended, dynamic port mapping)  
+  - **Bridge** (manual host port mapping)  
+  - **Host** (container port = host port)  
+- **Task Size** – CPU & memory allocation.  
+- **Task Role** – IAM role for containers to access AWS services (e.g., DynamoDB).  
+- **Task Execution Role** – IAM role for ECS agent to pull images & manage tasks.  
+- **Task Placement** – Controls how tasks are distributed across EC2 instances.  
+- **Fault Injection** – Introduces errors to test task resilience (new feature).  
+
+---
+
+#### **2. Container Definition**  
+- **Container Name** – Identifier for the container.  
+- **Container Image** – Docker image location (ECR, Docker Hub, etc.).  
+- **Essential Container** – If marked, stopping this container stops all others in the task.  
+- **Port Mapping** – Varies by networking mode:  
+  - **Bridge** → Specify both host & container ports.  
+  - **Host** → Only container port (host port matches).  
+  - **AWS VPC** → Only container port (host port dynamically assigned).  
+- **Root File Access** – Controls read-only access to the container’s root filesystem.  
+- **Resource Limits** – CPU, GPU, memory (soft/hard limits).  
+- **Environment Variables** – Key-value pairs for configuration.  
+- **Logging** – Supports:  
+  - **CloudWatch**  
+  - **Splunk**  
+  - **Kinesis/Kinesis Firehose**  
+  - **OpenSearch**  
+  - **S3**  
+  - **Third-party (Fluentd, Sumo Logic)**  
+- **Restart Policy** – Defines container restart behavior (new).  
+- **Health Check** – Configures interval, timeout, retries.  
+- **Networking** – DNS settings, links between containers.  
+- **Docker Config** – Entry point, command, working directory.  
+- **Ulimit** – OS-level limits (CPU, file size, memory).  
+
+---
+
+#### **3. Storage & Volumes**  
+- **Volume Types** – Options:  
+  - **Bind Mount** (host ↔ container)  
+  - **Docker Volume** (managed by Docker)  
+  - **EFS (Elastic File System)** – Shared across containers/tasks.  
+  - **FSX for Windows** – Used in Windows containers (not shared).  
+- **EFS Use Case** – Multiple tasks/containers can read/write to the same EFS filesystem.  
+
+---
+
+#### **4. Monitoring & Deployment**  
+- **Monitoring Tools** – Now supports:  
+  - **Prometheus** (metrics)  
+  - **AWS X-Ray** (tracing)  
+- **Configuration Type** – Applies during:  
+  - **Deployment** (container setup)  
+  - **Task Creation**  
+
+---
+
+### **Key Takeaways**  
+1. **Task Definition = Template**, **Task = Running Instance**.  
+2. **EFS allows shared storage** across containers/tasks.  
+3. **Essential Container** – If it fails, all containers in the task stop.  
+4. **AWS VPC Networking** is preferred (dynamic port mapping).  
+5. **New Features**: Fault injection, ulimit, expanded logging options.  
+
+---
+**Next Steps**:  
+- Practice creating task definitions in AWS ECS.  
+- Experiment with EFS for shared storage.  
+- Explore monitoring with X-Ray/Prometheus.  
+
+**section1.5**
+Here are the summarized notes from your demo on task definition creation:
+
+---
+
+### **Task Definition Demo Summary**
+
+#### **1. Objectives**
+- Create an ECS task definition (without creating tasks).
+- Implement a newsfeed app using ECS with:
+  - 5 Python programs (containers).
+  - 2 NoSQL databases: DynamoDB + ElastiCache.
+
+#### **2. Steps Covered**
+1. **Create ECR Repositories**  
+   - Private repositories for each container image.
+   - Used namespaces (e.g., `3am/`) to group repositories.
+   - Repositories created:  
+     - `add_news_articles`  
+     - `breaking_news`  
+     - `read_news`  
+     - `read_news_articles`  
+     - `report_news`  
+
+2. **IAM Roles**  
+   - **Task Role**: Grants permissions to containers (e.g., DynamoDB access).  
+     - Created policy: Full DynamoDB access.  
+     - Attached to role: `3IAM_ECS_Task_Policy_Role`.  
+   - **Task Execution Role**: Allows ECS to manage containers.  
+     - Used AWS-managed policy: `AmazonECSTaskExecutionRolePolicy`.  
+     - Role name: `3IAM_ECS_Task_Execution_Role`.  
+
+3. **Docker Setup**  
+   - Created `Dockerfile` for each Python program:  
+     - Base image: `python:3.12-slim`.  
+     - Copied code + `requirements.txt` (generated via `pip freeze`).  
+     - Installed dependencies with `pip3 install -r requirements.txt`.  
+     - Exposed ports (e.g., `10002` for `add_news_articles`).  
+   - Built and tagged images:  
+     ```bash
+     docker build -t add_news_articles .
+     docker tag add_news_articles:latest <ECR_URI>/add_news_articles:v1
+     ```  
+   - Pushed images to ECR using `docker push`.  
+
+4. **Task Definition Plan**  
+   - Group containers into 3 task definitions:  
+     - **Task 1**: `read_news` (essential) + `read_news_articles`.  
+     - **Task 2**: `report_news` (essential) + `add_news_articles`.  
+     - **Task 3**: `breaking_news` (standalone).  
+
+5. **Next Steps (Not Shown in Demo)**  
+   - Create task definitions in ECS console.  
+   - Run tasks and verify:  
+     - Check container status via `docker ps` on EC2 instances.  
+     - Monitor tasks in ECS console.  
+
+---
+
+### **Key Commands**
+- **ECR Push**:  
+  ```bash
+  aws ecr get-login-password | docker login --username AWS --password-stdin <ECR_URI>
+  docker tag <image>:latest <ECR_URI>/<repo>:v1
+  docker push <ECR_URI>/<repo>:v1
+  ```
+
+- **Docker Build**:  
+  ```dockerfile
+  FROM python:3.12-slim
+  WORKDIR /app
+  COPY . .
+  RUN pip3 install -r requirements.txt
+  EXPOSE <port>
+  CMD ["python3", "<script>.py"]
+  ```
+
+---
+
+### **Notes**
+- **Namespaces**: Optional but useful for organizing repos (e.g., by team).  
+- **IAM Roles**: Critical for permissions (task role = app permissions; execution role = ECS permissions).  
+- **Port Mapping**: Dynamic in AWS VPC mode (host port auto-assigned).  
+
+Let me know if you'd like to expand on any section!
