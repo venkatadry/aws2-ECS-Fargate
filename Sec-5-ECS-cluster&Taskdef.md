@@ -841,40 +841,628 @@ There are **two types** of data volumes in ECS:
 
 ***################################################################################***
 
-**39**
+**40 Create a complete Task Definition**
 
 **################################################################################**
+Here are the key notes from the provided content on creating an AWS ECS Task Definition:
+
+### **Components Needed Before Creating Task Definition**
+1. **AWS ECR Repository**
+   - Already created with two images:
+     - `AddMP:latest`
+     - `GetMP:latest`
+
+2. **VPC Setup**
+   - Contains:
+     - 2 private subnets
+     - 1 public subnet
+
+3. **Database (RDS)**
+   - **Instance Name:** `employee-db-instance`
+   - **Engine:** MySQL
+   - **Region:** `us-east-1b`
+   - **Instance Type:** `db.t2.micro`
+   - **Deployed in private subnets**
+   - **Endpoint & Port:** Available at port `3306`
+   - **Credentials:**
+     - Username: `root`
+     - Password: `Abcd1234`
+   - **Database Name:** `employee`
+
+4. **IAM Role for ECS Task**
+   - **Role Name:** `employee-application-task-role`
+   - **Permissions:** Full access (for demo, restrict in production)
+   - **Trust Relationship:** Allows ECS tasks to assume this role.
+
+---
+
+### **Creating the Task Definition**
+1. **Task Definition Type:** `EC2` (not Fargate)
+2. **Basic Configuration:**
+   - **Name:** `employee-application-task-dev`
+   - **Task Role:** `employee-application-task-role`
+   - **Network Mode:** `awsvpc` (VPC mode)
+   - **Task Execution Role:** Auto-created by ECS
+   - **Task Size:**
+     - Memory: `256 MB`
+     - CPU: `2 vCPU`
+
+3. **Container Definitions (Multi-Container Task)**
+   - **First Container:** `AddMP`
+     - **Image:** ECR URI for `AddMP:latest`
+     - **Memory Limits:**
+       - Hard: `100 MB`
+     - **Port Mappings:** `80` (exposed by container)
+     - **Environment Variables:**
+       - `DB_HOST`: RDS endpoint
+       - `DB_PORT`: `3306`
+       - `DB_USER`: `root`
+       - `DB_PWD`: `Abcd1234`
+       - `DATABASE`: `employee`
+   - **Second Container:** `GetMP`
+     - **Image:** ECR URI for `GetMP:latest`
+     - **Memory Limits:**
+       - Hard: `128 MB`
+       - Soft: `64 MB`
+     - **Port Mappings:** `8080` (exposed by container)
+     - **Environment Variables:** Same as `AddMP`.
+
+4. **Volumes:** Not required (apps interact directly with RDS).
+
+5. **Tags:**
+   - `employee-application`
+
+6. **Task Definition Created:**
+   - **Family Name:** `employee-application-task-dev`
+   - **Revision ID:** `1` (increments on updates).
+
+---
+
+### **Post-Creation Actions**
+1. **Run Task Directly**
+   - Can launch tasks directly from the definition.
+   - If `number of tasks = 2`, each runs 2 containers → Total **4 containers**.
+
+2. **Create/Update Service**
+   - Used for long-running tasks (e.g., web servers).
+   - Manages scaling, load balancing, and availability.
+
+3. **JSON View**
+   - Task definition can be viewed/modified in JSON format.
+   - Includes:
+     - Container definitions (images, ports, env vars).
+     - Network mode (`awsvpc`).
+     - Memory/CPU allocations.
+     - IAM role references.
+
+---
+
+### **Key Takeaways**
+- **Task Definitions** are blueprints for running containers in ECS.
+- **Multi-container tasks** allow co-located services (e.g., `AddMP` + `GetMP`).
+- **VPC Mode** ensures containers use private subnets for security.
+- **Environment Variables** securely pass DB credentials (avoid hardcoding).
+- **IAM Roles** grant permissions to ECS tasks (least privilege in production).
+
+Next Steps:  
+- Create an **ECS Cluster** and **Service** to deploy the task definition.  
+- Use **Load Balancers** if exposing services publicly.  
+
+
 ***################################################################################***
 
-**40**
+**41 Bridge networking mode TDEF component**
 
 **################################################################################**
+### **ECS Task Definition Components - Networking Mode (Bridge)**
+
+#### **Prerequisites:**
+1. **Cluster Creation:**
+   - Created a cluster named **`components-demo-cluster`**.
+   - Status: **Active**.
+   - Contains **1 running container instance** (EC2 - `t3.micro`).
+   - No running tasks or services.
+
+2. **ECR Repository:**
+   - Created a repository named **`dev-components`**.
+   - No existing images; needs to push a Docker image.
+
+---
+
+### **Steps to Push Docker Image to ECR:**
+1. **Dockerfile Used:**
+   ```dockerfile
+   FROM centos:latest
+   RUN yum install httpd -y
+   COPY index.html /var/www/html/
+   COPY image.png /var/www/html/
+   EXPOSE 80
+   ENTRYPOINT ["/usr/sbin/httpd", "-D", "FOREGROUND"]
+   ```
+   - Simple Apache web server running on **port 80**.
+
+2. **Build and Test Locally:**
+   - Built image: `docker build -t dev:latest .`
+   - Ran container: `docker run -d -p 8080:80 dev:latest`
+   - Tested locally: `http://localhost:8080` (working).
+
+3. **Push to ECR:**
+   - Authenticated Docker to ECR:
+     ```bash
+     aws ecr get-login-password | docker login --username AWS --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
+     ```
+   - Tagged image:
+     ```bash
+     docker tag dev:latest <account-id>.dkr.ecr.<region>.amazonaws.com/dev-components:latest
+     ```
+   - Pushed image:
+     ```bash
+     docker push <account-id>.dkr.ecr.<region>.amazonaws.com/dev-components:latest
+     ```
+   - Verified in ECR console.
+
+---
+
+### **Task Definition Setup (Bridge Networking Mode)**
+1. **Task Definition Details:**
+   - **Name:** `tdf-components-demo`
+   - **Launch Type:** EC2
+   - **Network Mode:** `bridge`
+   - **Task Size:**
+     - CPU: **1 vCPU** (since `t3.micro` has 2 vCPUs, max 2 tasks per instance).
+     - Memory: **64 MB** (low to fit in `t3.micro`'s 1GB RAM).
+
+2. **Container Definition:**
+   - **Name:** `apache-container`
+   - **Image URI:** ECR image URI (`dev-components:latest`)
+   - **Port Mappings:**
+     - **Container Port:** `80`
+     - **Host Port:** `8080` (explicitly mapped).
+
+3. **No Volumes/Advanced Configurations:**
+   - Skipped health checks, environment variables, etc.
+
+4. **Created Task Definition.**
+
+---
+
+### **Running the Task**
+1. **Run Task in Cluster:**
+   - Cluster: `components-demo-cluster`
+   - Launch Type: EC2
+   - Number of Tasks: `1`
+   - Task Group: `bridge`
+   - **No VPC/Security Group** (since using `bridge` mode).
+
+2. **Task Execution:**
+   - Task started successfully on the single EC2 instance.
+   - Verified in EC2 instance:
+     ```bash
+     docker ps
+     ```
+     - Shows container running with `8080:80` mapping.
+   - Accessed app via EC2 public IP: `http://<EC2-IP>:8080`.
+
+3. **Attempt to Run Second Task:**
+   - Failed with error: **"Resource:PORTS"**.
+   - Reason: Port `8080` already in use on the host (bridge mode requires unique host ports).
+
+4. **Scaled Cluster:**
+   - Added **second EC2 instance** (scaled to 2 instances).
+   - Ran task again → Success (task ran on the new instance).
+
+---
+
+### **Key Observations:**
+1. **Bridge Networking Mode:**
+   - Explicit host port mapping (`hostPort:containerPort`).
+   - **Cannot run multiple tasks on the same instance** if they use the same host port.
+   - Requires **separate EC2 instances** for multiple tasks (inefficient for scaling).
+
+2. **Dynamic Port Mapping Limitation:**
+   - Unlike **`awsvpc`** mode (which allows dynamic ports), `bridge` mode requires manual port management.
+
+3. **Use Case:**
+   - Suitable for **legacy applications** relying on Docker’s default bridge network.
+   - Not ideal for scalable microservices.
+
+---
+
+### **Next Steps:**
+- **Host Networking Mode:**  
+  - Containers use host’s network directly (no NAT).
+  - Still faces port conflicts but with different behavior.
+- **awsvpc Mode:**  
+  - Assigns ENI to each task (best for scalability + security).
+
+---
+### **Summary of Actions:**
+1. Created cluster + ECR repo.
+2. Built/pushed Docker image.
+3. Created task definition (`bridge` mode).
+4. Ran task → Success (1 instance).
+5. Failed on second task (port conflict).
+6. Scaled cluster → Success (2 instances).
+
+**Conclusion:**  
+`bridge` mode is restrictive for multi-task deployments. **`awsvpc`** (covered later) solves this.  
+
+
+
 ***################################################################################***
 
-**31**
+**42 Host networking mode TDEF component**
 
 **################################################################################**
+# **Lab Notes: Host Networking Mode and VPC Networking Mode in AWS ECS**
+
+## **1. Host Networking Mode**
+### **Prerequisites:**
+- **ECS Cluster**: Running with **2 components**, but only **1 EC2 instance** is active.
+  - **Instance ID**: Visible in the ECS console.
+  - **Status**: Active.
+  - **Registered Container Instances**: 1.
+- **ECR Repository**: Contains the Docker image (`components:latest`) used in previous demos.
+- **Task Definition**: Already created with **Revision ID 1** (`components-demo:1`).
+
+### **Modifying Task Definition for Host Networking**
+- To change networking mode, create a **new revision** (similar to versioning).
+- **Steps**:
+  1. Open the existing task definition.
+  2. Click **Create new revision**.
+  3. Change **Networking Mode** from `bridge` to `host`.
+  4. **No host port mapping needed** (automatically binds container port `80` to host port `80`).
+  5. **New Revision ID**: `4` (earlier revisions were created for testing).
+
+### **Running a Task in Host Mode**
+- **Launch Type**: `EC2` (since host mode requires EC2 instances).
+- **Task Group Name**: `host`.
+- **Number of Tasks**: `1`.
+- **Result**: Task runs successfully on the existing EC2 instance.
+
+### **Verification**
+- **SSH into the EC2 instance** and check running containers:
+  ```bash
+  docker ps
+  ```
+  - Shows the container running on **port 80** (mapped to host port `80`).
+- **Access the application**:  
+  - Open browser/curl to instance IP on port `80` → Application is accessible.
+
+### **Limitation: Port Conflict**
+- **Attempt to run a second task**:
+  - Fails with error: **"Resource ports are already in use"**.
+  - Reason: Only **one container per host port** (port `80` already occupied).
+- **Solution**:  
+  - **Scale the cluster** (add another EC2 instance).
+  - **Run task again** → Now it launches on the **new instance**.
+
+### **Key Observations**
+- **Performance**: Host mode has **better networking performance** than bridge mode.
+- **Limitation**:  
+  - Only **one container per image** can run on an instance (due to port binding).
+  - Similar issue exists in **bridge mode** (explicit host port mapping required).
+
+---
+
+## **2. VPC Networking Mode (Preview)**
+*(Not fully detailed in the transcript but implied as the next topic.)*
+
+### **Expected Differences from Host Mode**
+- **AWS-managed networking** (no direct host port binding).
+- **Elastic Network Interface (ENI) per task** → No port conflicts.
+- **Supports multiple tasks per instance** (unlike host mode).
+- **Better isolation & security** (each task gets its own IP).
+
+### **Comparison Table**
+| Feature          | Host Mode                     | Bridge Mode                   | VPC Mode                     |
+|------------------|------------------------------|-------------------------------|------------------------------|
+| **Performance**  | High (direct host networking) | Moderate (NAT via Docker)     | High (AWS-managed ENI)       |
+| **Port Mapping** | Auto (container=host port)    | Manual (specify host port)    | No host port conflicts       |
+| **Scalability**  | Limited (1 task per port)     | Limited (manual port mapping) | High (no port conflicts)     |
+| **Use Case**     | Low-latency apps              | Legacy Docker compatibility   | Modern AWS-native workloads  |
+
+---
+
+## **Conclusion**
+- **Host mode** improves performance but **restricts task density** per instance.
+- **VPC mode** (next topic) resolves these issues with **better scalability** and **no port conflicts**.
+- **Bridge mode** is legacy-compatible but **less efficient** than host/VPC modes.  
+
+
 
 ***################################################################################***
 
-**31**
+**43 AWS VPC networking mode**
 
 **################################################################################**
+### **Notes: VPC Network Component Demo in AWS ECS**
+
+#### **Prerequisites**
+- A cluster named **"components VPC"** is already created.
+- No services or tasks are currently running on this cluster.
+- An EC2 instance is running with instance type **t3.small** (chosen for sufficient ENIs).
+
+---
+
+### **Steps in the Demo**
+
+#### **1. Task Definition Setup**
+- **Repository**: Using the same repository (unchanged).
+- **Task Definition**: 
+  - Navigate to the existing task definition.
+  - **Create a new revision** (last revision ID is used).
+  - **Network Mode**: Changed to **"awsvpc"** (AWS VPC mode).
+    - Containers in the task share an **Elastic Network Interface (ENI)**.
+    - Port mappings only specify **container ports** (no host ports).
+    - **Important**: If running multiple containers on the same host, multiple ENIs are needed.
+
+#### **2. Running the Task**
+- **Cluster**: Selected **"components VPC"**.
+- **Subnets**: Chose **1C and 1D**.
+- **Security Group**: Configured to allow SSH access.
+- **Public IP**: Disabled (not needed for this demo).
+- **Task Execution**:
+  - Task status changes to **"running"**.
+  - **No ports visible** in the container (due to dynamic port mapping in `awsvpc` mode).
+  - **Cannot directly access** the app (requires an **Elastic Load Balancer** for reverse proxy).
+
+#### **3. Running a Second Task**
+- **Same Task Definition**: Launched another task in the same cluster.
+- **Same EC2 Instance**: Both tasks run on the **same container instance** (only 1 EC2 instance registered).
+- **Verification**:
+  - Checked running containers inside the EC2 instance (`docker ps`).
+  - **Two containers** are running with the same image.
+
+#### **4. Key Observations**
+- **AWS VPC Mode** allows **multiple containers** (same image) on a **single EC2 instance**.
+- **ENI Limitation**:
+  - **t3.small** was chosen because it supports multiple ENIs.
+  - **t2.micro / t3.micro** would fail (insufficient ENIs).
+  - Error: `Unable to assign Elastic Network Interface` if ENIs are insufficient.
+
+#### **5. Comparison with Other Network Modes**
+- **Bridge Mode**: Requires explicit host port mapping (port conflicts possible).
+- **Host Mode**: Binds directly to host ports (only one container per port).
+- **AWS VPC Mode**:
+  - No port conflicts.
+  - Requires **ELB** for access (dynamic ports).
+  - Better isolation and scalability.
+
+---
+
+### **Next Steps**
+- Use an **Elastic Load Balancer (Classic/ALB)** to expose the application.
+- Discuss **ECS Services** in the next section for managing long-running tasks.
+
+---
+
+### **Key Takeaways**
+✅ **AWS VPC mode** enables **multi-container deployments** on a single host.  
+✅ **Dynamic port mapping** requires an **ELB** for accessibility.  
+✅ **Instance type matters** (ensure enough ENIs for multiple tasks).  
+✅ **Better than Bridge/Host mode** for avoiding port conflicts.  
+
+---
+**Demo by: [Instructor's Name]** | **AWS ECS - VPC Networking Mode**  
+**Next Topic: ECS Services & Load Balancing**
+
+
 ***################################################################################***
 
-**31**
+**44 Volumes TDEF component**
 
 **################################################################################**
+### **Notes: Task Definition - Volumes in AWS ECS**  
+
+#### **Key Points Covered in the Video:**  
+1. **Volumes in Task Definitions**  
+   - Last component of task definition.  
+   - Comparison between **bind mounts** and **Docker volumes**.  
+
+2. **Prerequisites**  
+   - Existing AWS ECS cluster (reusing previous setup).  
+   - New Docker image with a **volume directive** in the Dockerfile.  
+
+3. **Dockerfile Modification**  
+   - Added `VOLUME ["/var/www/html"]` to specify a mount point in the container.  
+   - Built and tagged the image as `x-volume`.  
+   - Pushed to a new Docker repository.  
+
+4. **Task Definition Setup (Docker Volumes)**  
+   - Created a new task definition (EC2 launch type, host network mode).  
+   - Added container details:  
+     - Image: `x-volume`  
+     - Port mapping: `80:80`  
+     - **No explicit volume mount** (default Docker volume behavior).  
+   - Ran the task and verified:  
+     - Docker automatically creates a volume (`/var/lib/docker/volumes/...`).  
+     - Changes in the volume reflect in the container (e.g., modified `index.html`).  
+
+5. **Bind Mounts Demonstration**  
+   - Created a **new task revision** with a **bind mount**:  
+     - Host path: `/home/ec2-user/dev-volumes`  
+     - Container path: `/var/www/html`  
+   - Key differences from Docker volumes:  
+     - **Bind mounts work "backwards"**—host directory overrides container directory.  
+     - If the host directory is empty, the container directory appears empty.  
+     - Changes must be made on the **host first**, then reflected in the container.  
+   - Tested by creating `index.html` on the host → visible in the container.  
+
+6. **Comparison Summary**  
+   | **Feature**       | **Docker Volumes**                          | **Bind Mounts**                          |  
+   |-------------------|--------------------------------------------|------------------------------------------|  
+   | **Managed by**    | Docker                                     | User-specified host path                 |  
+   | **Persistence**   | Survives container removal                 | Tied to host directory                   |  
+   | **Initial Data**  | Retains container directory contents       | Overrides container directory            |  
+   | **Use Case**      | Persistent data (DB, logs)                 | Host-container file sharing (configs)    |  
+
+7. **Next Topic: Services**  
+   - **Run Task** is for testing; **Services** are for production.  
+   - Services provide:  
+     - Load balancing integration.  
+     - Auto-scaling capabilities.  
+     - Task lifecycle management (restart on failure).  
+
+---  
+### **Key Takeaways**  
+- **Docker volumes** are managed by Docker and persist independently of containers.  
+- **Bind mounts** link host directories directly to containers (host files take precedence).  
+- **Task definitions** must explicitly define volumes for bind mounts.  
+- **Services** (next topic) abstract task management for production workloads.  
+
+Would you like a simplified step-by-step guide for implementing volumes in ECS? 😊
+
 ***################################################################################***
 
-**31**
+**45 TDEF summary**
 
 **################################################################################**
+### **Summary: Task Definition in AWS ECS**  
+
+#### **1. Task Definition**  
+- A **blueprint** for running containers in ECS.  
+- Contains **one or more container definitions** (similar to `docker run` options).  
+- Specifies:  
+  - Docker image, CPU/memory (**task size**), networking (**network mode**), volumes, environment variables, etc.  
+
+#### **2. ECS Cluster**  
+- A **group of EC2 instances** (managed via Auto Scaling).  
+- Tasks run on these instances.  
+
+#### **3. Running a Task**  
+- A **task** is an **instance of a task definition** (like a running containerized application).  
+- Example:  
+  - **Task Definition** = Blue Container + Green Container.  
+  - **Run Task 1** → Launches **Blue + Green Containers (Instance 1)**.  
+  - **Run Task 2** → Launches **Blue + Green Containers (Instance 2)**.  
+
+#### **4. Next Step: ECS Services**  
+- Instead of manually running tasks, **ECS Services** help maintain desired task count (auto-recovery, scaling).  
+
+### **Key Takeaway**  
+- **Task Definition** = Container configuration (like `docker run`).  
+- **Task** = Running instance of the definition.  
+- **Cluster** = Group of EC2 instances where tasks run.  
+- **Services** (next topic) = Managed way to run tasks.  
+
+Let me know if you'd like any refinements! 🚀
+
+
 ***################################################################################***
 
-**31**
+**46 Cases tudt TDEF & Run**
 
 **################################################################################**
+### **Notes on Implementing an Application Using ECS (Elastic Container Service)**  
+
+#### **1. Overview**  
+- Discussed **talkativeness definition** (likely a placeholder term).  
+- Proceeding to implement an application using **ECS** with **class definitions** (instead of a case study).  
+- Need to **create a cluster** before deploying the application.  
+
+---
+
+#### **2. Cluster Creation**  
+- **Cluster setup** is assumed to be known (skipped detailed steps).  
+- Creating a **Limitlessness application cluster** (likely a typo, should be **ECS cluster**).  
+- Cluster creation provisions an **EC2 instance** (needed for IP address configuration).  
+
+---
+
+#### **3. Application Setup**  
+- Two Flask-based applications:  
+  - **`Adiam`** (serves on port `80`)  
+  - **`GetEmp`** (serves on port `8000`)  
+- **Hardcoded IP addresses** in the application (temporary, should be parameterized).  
+- **Database dependency**: Uses an **RDS MySQL instance** (endpoint: `port 3306`).  
+
+---
+
+#### **4. Docker Image Creation & Upload**  
+- **Dockerfile Structure**:  
+  - Uses **Ubuntu** base image.  
+  - Copies `requirements.txt` → Installs dependencies (`pip install -r requirements.txt`).  
+  - Copies Python files (`app.py`) and templates (`HTML` files).  
+  - Exposes ports (`80` for `Adiam`, `8000` for `GetEmp`).  
+  - Runs the Flask app (`CMD ["python", "app.py"]`).  
+
+- **Steps**:  
+  1. **Build images**:  
+     ```sh
+     docker build -t adiam:latest .
+     docker build -t getemp:latest .
+     ```  
+  2. **Push to ECR (Elastic Container Registry)**:  
+     - Created repositories (`adiam`, `getemp`).  
+     - Pushed images using `docker push`.  
+
+---
+
+#### **5. ECS Task Definition**  
+- **Task Role**: `employapp-task-role` (full DB access).  
+- **Networking Mode**: Initially set to **`awsvpc`** (VPC mode).  
+- **Containers Added**:  
+  - `Adiam` (port `80`)  
+  - `GetEmp` (port `8000`)  
+- **Environment Variables**:  
+  - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (for DB connection).  
+
+---
+
+#### **6. Running the Task**  
+- **Issue**: Application **not accessible** despite containers running.  
+  - **Reason**: **`awsvpc` networking mode** hides container ports.  
+  - **Solution**: Switch to **`host` network mode** (exposes ports directly on EC2).  
+
+- **Fix**:  
+  1. Updated task definition to use **`host` networking**.  
+  2. Containers now bind to host ports (`80` and `8000`).  
+  3. Application becomes accessible via EC2 instance IP.  
+
+---
+
+#### **7. Testing the Application**  
+- **`Adiam`**:  
+  - Endpoint: `http://<EC2_IP>:80`  
+  - **Function**: Inserts employee data into DB.  
+- **`GetEmp`**:  
+  - Endpoint: `http://<EC2_IP>:8000`  
+  - **Function**: Retrieves employee data.  
+
+- **Bug Fix**:  
+  - **SQL Error**: Column name mismatch (`emp_id` vs `empID`).  
+  - Updated Python code to match DB schema.  
+
+---
+
+#### **8. Key Takeaways**  
+- **Networking Modes Matter**:  
+  - Use **`host`** for direct port access (testing).  
+  - Use **`awsvpc`** for production (isolated networking).  
+- **Avoid Hardcoding**:  
+  - IPs, DB credentials, and ports should be **environment variables**.  
+- **Debugging Tips**:  
+  - Check **container logs** (`docker logs`).  
+  - Verify **port mappings** and **security groups**.  
+
+---
+
+### **Final Notes**  
+- Successfully deployed a **multi-container Flask app** on ECS.  
+- Demonstrated **networking mode impact** on accessibility.  
+- Highlighted **debugging steps** for containerized apps.  
+
+🚀 **Next Steps**:  
+- Replace hardcoded values with **parameter store/Secrets Manager**.  
+- Use **ALB (Application Load Balancer)** for scalable access.  
+- Automate deployments with **CI/CD pipelines**.  
+
+--- 
+
+Let me know if you'd like any section expanded!
+
+
 ***################################################################################***
 
 **31**
