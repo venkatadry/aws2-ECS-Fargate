@@ -36,7 +36,8 @@
 ### **4. Service**  
 - Ensures **long-running tasks** (like a web server).  
 - Handles **scaling, load balancing, and self-healing**.  
-- Works with **ALB/NLB** for traffic distribution.  
+- Works with **ALB/NLB** for traffic distribution.
+  A task is the instantiation of a task definition within a cluster. After you create a task definition for your application within Amazon ECS, you can specify the number of tasks to run on your cluster. An Amazon ECS service runs and maintains your desired number of tasks simultaneously in an Amazon ECS cluster.
 
 ### **5. Elastic Container Registry (ECR)**  
 - **AWS private Docker registry**.  
