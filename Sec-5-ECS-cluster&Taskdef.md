@@ -57,6 +57,74 @@
 - AWS handles **scaling, patching, and resource allocation**.  
 - Pay only for **resources used by tasks**.  
 
+In AWS ECS (Elastic Container Service), the networking behavior differs between the **EC2 launch type** and the **Fargate launch type** due to their underlying architectures. Here’s a breakdown of the key differences:
+
+### **1. Networking Mode Options**
+| Feature          | ECS EC2 Launch Type | ECS Fargate Launch Type |
+|------------------|---------------------|-------------------------|
+| **Supported Network Modes** | `bridge`, `host`, `awsvpc`, `none` | Only `awsvpc` (default) |
+| **Default Network Mode** | `bridge` (Docker default) | `awsvpc` (mandatory) |
+
+### **2. Key Differences**
+#### **A. IP Addressing & Network Interface**
+- **EC2 Launch Type**:
+  - **Bridge Mode**: Containers share the EC2 instance's ENI (Elastic Network Interface) and get private IPs assigned by Docker.
+  - **Host Mode**: Containers use the host (EC2 instance) network stack directly.
+  - **awsvpc Mode**: Each task gets its own ENI and a dedicated private IP (similar to Fargate).
+  - **None Mode**: No networking (used for specialized cases).
+  
+- **Fargate Launch Type**:
+  - Only supports **awsvpc mode**.
+  - Each task gets its own ENI with a dedicated private IP (no port conflicts).
+  - No access to host networking or Docker bridge networking.
+
+#### **B. Security Groups**
+- **EC2 Launch Type**:
+  - In `bridge`/`host` mode, security groups are applied at the **EC2 instance level**.
+  - In `awsvpc` mode, tasks can have their own security groups.
+  
+- **Fargate Launch Type**:
+  - Each task must have **its own security group(s)** since it uses `awsvpc`.
+  - Security groups are applied at the **task level**.
+
+#### **C. Service Discovery & Load Balancing**
+- **EC2 Launch Type**:
+  - In `bridge` mode, dynamic host ports are used (requires ALB/NLB with dynamic port mapping).
+  - In `awsvpc` mode, tasks can be directly registered with a target group (like Fargate).
+  
+- **Fargate Launch Type**:
+  - Always uses `awsvpc`, so tasks can be directly registered with ALB/NLB target groups.
+  - Supports **AWS Cloud Map** for service discovery.
+
+#### **D. Scalability & Performance**
+- **EC2 Launch Type**:
+  - Limited by EC2 instance ENI limits (varies by instance type).
+  - Multiple tasks can share an ENI in `bridge` mode.
+  
+- **Fargate Launch Type**:
+  - Each task gets its own ENI (no port conflicts).
+  - No need to manage underlying EC2 instances.
+
+### **3. When to Use Which?**
+- **Use EC2 Launch Type** if:
+  - You need `host` or `bridge` networking (e.g., for performance-sensitive workloads).
+  - You want to manage the underlying EC2 instances.
+  
+- **Use Fargate Launch Type** if:
+  - You want serverless container management (no EC2 management).
+  - You need per-task security groups and IPs.
+  - You prefer simplified networking with `awsvpc`.
+
+### **Summary Table**
+| Feature          | EC2 Launch Type | Fargate Launch Type |
+|------------------|----------------|---------------------|
+| **Network Modes** | `bridge`, `host`, `awsvpc`, `none` | Only `awsvpc` |
+| **IP per Task** | Only in `awsvpc` mode | Always (mandatory `awsvpc`) |
+| **Security Groups** | Instance-level (except `awsvpc`) | Task-level |
+| **Service Discovery** | Works with `awsvpc` | Native (Cloud Map) |
+| **Scalability** | Limited by EC2 ENIs | No ENI limits per task |
+
+Would you like a deeper dive into any specific aspect?
 ---  
 
 ## **Workflow**  
