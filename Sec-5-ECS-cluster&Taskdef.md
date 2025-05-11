@@ -72,6 +72,52 @@ In AWS ECS (Elastic Container Service), the networking behavior differs between 
   - **Host Mode**: Containers use the host (EC2 instance) network stack directly.
   - **awsvpc Mode**: Each task gets its own ENI and a dedicated private IP (similar to Fargate).
   - **None Mode**: No networking (used for specialized cases).
+ 
+    [![Bridge mode :: Amazon ECS Workshop](https://images.openai.com/thumbnails/46040d7828aff3965dbdb94f910bd534.png)](https://ecsworkshop.com/networking_sd/ecs_networking/bridge/)
+
+In AWS Elastic Container Service (ECS), port mapping determines how containers expose their ports to the host system or other services. This is particularly important when deploying containers within a Virtual Private Cloud (VPC), as it affects how network traffic is routed to and from your containers.([AWS Documentation][1])
+
+### Port Mapping in ECS
+
+When defining a container in an ECS task definition, you specify port mappings to control how the container's ports are exposed:([Amazon Web Services, Inc.][2])
+
+* **`containerPort`**: The port inside the container that the application listens on.
+* **`hostPort`**: The port on the host (EC2 instance) that maps to the container's port.
+
+The behavior of these mappings varies depending on the ECS networking mode:
+
+#### 1. `bridge` Mode (Default for EC2 Launch Type)
+
+In `bridge` mode, containers share the host's network stack but have their own isolated network namespace. You can specify a `hostPort` to map to the `containerPort`. If you set `hostPort` to `0`, ECS assigns an ephemeral port from the host's available range. This allows multiple containers to run on the same host without port conflicts by dynamically assigning host ports. ([ECS Workshop][3], [AWS Documentation][1], [Amazon Web Services, Inc.][4])
+
+#### 2. `host` Mode
+
+In `host` mode, the container shares the host's network namespace, meaning the `containerPort` and `hostPort` must be the same. This is suitable for applications requiring high network performance or when you want the container to use the host's IP address directly.
+
+#### 3. `awsvpc` Mode
+
+The `awsvpc` mode provides each task with its own Elastic Network Interface (ENI), effectively giving it a unique private IP address within the VPC. This mode allows containers to use VPC features like security groups and VPC flow logs. In this mode, you don't need to specify `hostPort`; instead, you define `containerPort`, and ECS manages the networking. This mode is ideal for microservices architectures and when fine-grained network control is required. ([Amazon Web Services, Inc.][5], [AWS Documentation][6])
+
+### Dynamic Port Mapping with Load Balancers
+
+When using ECS with an Application Load Balancer (ALB) or Network Load Balancer (NLB), you can enable dynamic port mapping. This allows multiple tasks to run on the same EC2 instance without port conflicts by assigning a unique host port to each task. To set this up:([Repost][7], [Amazon Web Services, Inc.][4])
+
+1. **Create an ALB or NLB**: Set up a load balancer and configure a target group.
+2. **Configure Health Checks**: Ensure health checks are set to use the traffic port.
+3. **Define Task Definition**: In the ECS task definition, set `hostPort` to `0` and specify the `containerPort`.
+4. **Create ECS Service**: When creating the ECS service, associate it with the load balancer and target group.([Repost][8], [AWS Documentation][1])
+
+This setup allows the load balancer to route traffic to the correct task on the appropriate host port. ([Repost][7])
+
+### Choosing the Right Networking Mode
+
+* **Use `awsvpc` mode** for tasks requiring individual IP addresses, fine-grained security controls, and integration with VPC features.
+* **Use `bridge` mode** when running multiple containers on the same host and needing dynamic port assignments.
+* **Use `host` mode** for applications that need to use the host's network stack directly, offering high performance and low latency.([ECS Workshop][3])
+
+Selecting the appropriate networking mode and configuring port mappings correctly is crucial for ensuring efficient and secure communication within your ECS-based applications.
+
+
   
 - **Fargate Launch Type**:
   - Only supports **awsvpc mode**.
