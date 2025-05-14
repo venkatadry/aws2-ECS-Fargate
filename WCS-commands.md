@@ -196,36 +196,115 @@ In **Amazon ECS (Elastic Container Service)**, **SSM (AWS Systems Manager)** is 
 ### 5. **Managing ECS Instances (EC2 Launch Type)**
    - If using the **EC2 launch type**, SSM can manage the underlying EC2 instances (patching, updates, etc.).
 
-### **How to Enable SSM for ECS?**
-1. **Ensure ECS Tasks Have SSM Permissions**  
-   - Attach an IAM policy with `ssm:StartSession` permissions to the ECS task role.
-   - Example policy:
-     ```json
-     {
-       "Version": "2012-10-17",
-       "Statement": [
-         {
-           "Effect": "Allow",
-           "Action": [
-             "ssmmessages:CreateControlChannel",
-             "ssmmessages:CreateDataChannel",
-             "ssmmessages:OpenControlChannel",
-             "ssmmessages:OpenDataChannel"
-           ],
-           "Resource": "*"
-         }
-       ]
-     }
-     ```
+To ensure your Amazon ECS tasks have the necessary AWS Systems Manager (SSM) permissions, you need to configure the IAM roles associated with your ECS tasks appropriately. Here's how to do it:
 
-2. **Enable ECS Exec When Starting a Task**  
-   - Use the `--enable-execute-command` flag:
-     ```bash
-     aws ecs run-task \
-       --cluster my-cluster \
-       --task-definition my-task-definition \
-       --enable-execute-command
-     ```
+---
+
+### 1. **Assign an IAM Task Role**
+
+Each ECS task should have an IAM role associated with it. This role allows the containers within the task to access other AWS services securely. The IAM task role is specified in your ECS task definition. To create this role, use the ECS Task Use Case in the IAM console, and ensure the trust policy allows ECS tasks to assume the role:([AWS Documentation][1], [AWS Documentation][2])
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+
+
+This setup ensures that your ECS tasks can assume the IAM role and access the permissions granted to it. ([AWS Documentation][2])
+
+---
+
+### 2. **Add SSM Permissions to the Task Role**
+
+To allow your ECS tasks to interact with AWS Systems Manager, you must grant the necessary permissions in the IAM task role. For ECS Exec functionality, add the following permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+
+
+These permissions enable the necessary communication between the ECS task and the SSM service for features like ECS Exec. ([AWS Documentation][1])
+
+---
+
+### 3. **Configure the Task Execution Role (if applicable)**
+
+If your ECS tasks need to access other AWS services, such as retrieving parameters from Systems Manager Parameter Store or secrets from Secrets Manager, you should configure the Task Execution Role. This role is used by the ECS agent to pull container images and manage logs.([AWS Documentation][3], [AWS Documentation][1])
+
+For accessing Systems Manager Parameter Store, add the following permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameters",
+        "ssm:GetParameter",
+        "ssm:GetParameterHistory"
+      ],
+      "Resource": "arn:aws:ssm:region:account-id:parameter/parameter-name"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "arn:aws:kms:region:account-id:key/kms-key-id"
+    }
+  ]
+}
+```
+
+
+
+Replace `region`, `account-id`, `parameter-name`, and `kms-key-id` with your specific values. ([Repost][4])
+
+---
+
+### 4. **Attach the Policies to the Appropriate Roles**
+
+After creating the necessary IAM policies, attach them to the respective IAM roles:([Repost][4])
+
+* **Task Role**: Attach the policy granting SSM permissions.
+* **Task Execution Role**: Attach the policy granting access to Systems Manager Parameter Store or Secrets Manager, if needed.
+
+Ensure that the ECS task definition references the correct IAM roles.&#x20;
+
+---
+
+By following these steps, you can ensure that your ECS tasks have the appropriate SSM permissions to interact with AWS Systems Manager services securely.
+
+[1]: https://docs.aws.amazon.com/en_en/AmazonECS/latest/developerguide/task-iam-roles.html?utm_source=chatgpt.com "Amazon ECS task IAM role - Amazon Elastic Container Service"
+[2]: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-iam-roles.html?utm_source=chatgpt.com "Best practices for IAM roles in Amazon ECS - Amazon Elastic Container Service"
+[3]: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html?utm_source=chatgpt.com "Amazon ECS task execution IAM role - Amazon Elastic Container Service"
+[4]: https://repost.aws/knowledge-center/ecs-manage-secrets-access-keys?utm_source=chatgpt.com "Manage secrets and access keys for Amazon ECS | AWS re:Post"
+
 
 ### **Conclusion**
 SSM in ECS is primarily used for **secure command execution, debugging, and automation**, reducing reliance on SSH and improving security. It's especially useful in **Fargate** where direct SSH access is not possible.
