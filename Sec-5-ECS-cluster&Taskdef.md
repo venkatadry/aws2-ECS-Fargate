@@ -1590,4 +1590,44 @@ Let me know if you'd like any section expanded!
 
 **################################################################################**
 
+# IAM Task Role and Execution Role for ECS - Interview Explanation
+
+When preparing for an AWS ECS interview, understanding IAM roles is crucial. Here's a clear explanation of Task Roles and Execution Roles in ECS:
+
+## Task Role (Task IAM Role)
+- **Purpose**: Provides permissions to your ECS tasks (containers) to access AWS services
+- **Usage**: Used by the application code running inside your containers
+- **Example**: If your container needs to write to S3 or query DynamoDB, it uses this role
+- **Key Point**: This is the identity your task assumes when making AWS API calls
+
+## Execution Role (Task Execution IAM Role)
+- **Purpose**: Grants permissions to the ECS agent and Docker daemon to manage tasks
+- **Usage**: Required for ECS to pull container images, manage logs, etc.
+- **Common permissions needed**:
+  - Pull images from ECR
+  - Send logs to CloudWatch
+  - Access secrets in Secrets Manager/Parameter Store
+- **Key Point**: This is used by the ECS infrastructure, not your application code
+
+## Interview Tips:
+1. **Key Difference**: 
+   - Task Role = for your application
+   - Execution Role = for ECS infrastructure
+
+2. **When to use which**:
+   - "My container needs to write to S3" → Task Role
+   - "My task needs to pull an image from ECR" → Execution Role
+
+3. **Common Mistakes**:
+   - Confusing the two roles
+   - Giving the execution role unnecessary permissions
+   - Not using the execution role at all (required for Fargate)
+
+4. **Advanced Topics**:
+   - Role inheritance (tasks can inherit permissions from EC2 instance profile if running on EC2)
+   - Temporary credentials via the metadata endpoint
+   - Scoping down permissions with conditions
+
+Would you like me to elaborate on any specific aspect of these roles for your interview preparation?
+
 
