@@ -1,3 +1,6 @@
+DR- https://yegortokmakov.medium.com/cross-region-disaster-recovery-with-amazon-elastic-container-service-782bcd007102
+https://aws.plainenglish.io/multi-region-dr-for-ecs-fargate-a-practical-guide-0b59a9893bdb
+
 # aws2-ECS-Fargate
 Amazon ECS (Elastic Container Service) — a fully managed container orchestration service by AWS
 ![image](https://github.com/user-attachments/assets/54bab812-4312-4371-a88b-2233b63d7c82)
