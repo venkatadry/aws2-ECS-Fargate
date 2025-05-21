@@ -219,3 +219,87 @@ https://mihirpopat.medium.com/mastering-aws-ecs-scenario-based-questions-you-mus
    - Prioritize certain capacity providers
 
 These questions cover a wide range of ECS concepts from fundamental to advanced, helping you prepare for interviews at various levels of expertise.
+
+
+
+**Troubleshooting**
+# Compute resource definitions are nested in the wrong attribute
+
+```
+{
+    "family": "backend-flask",
+    "executionRoleArn": "arn:aws:iam::501753804709:role/CruddurServiceExecutionRole",
+    "taskRoleArn": "arn:aws:iam::501753804709:role/CruddurTaskRole",
+    "networkMode": "awsvpc",
+    "containerDefinitions": [
+      {
+        "name": "backend-flask",
+        "image": "501753804709.dkr.ecr.us-east-1.amazonaws.com/backend-flask",
+        "cpu": 256,         <--------- these attributes shouldn't be nested
+        "memory": 512,      <---------
+        "essential": true,
+        "portMappings": [
+```
+# Correctly updated
+```
+# Correctly updated
+{
+    "family": "backend-flask",
+    "executionRoleArn": "arn:aws:iam::501753804709:role/CruddurServiceExecutionRole",
+    "taskRoleArn": "arn:aws:iam::501753804709:role/CruddurTaskRole",
+    "networkMode": "awsvpc",
+    "cpu": 256,       <------------- Define fargate server resource
+    "memory": 512,    <-------------
+    "containerDefinitions": [
+      {
+        "name": "backend-flask",
+        "image": "501753804709.dkr.ecr.us-east-1.amazonaws.com/backend-flask",
+        "essential": true,
+        "portMappings": [
+```
+
+**Issue2**
+Backend Health check 1 (local)
+
+Findings & leads
+I found that the line response = urllib.request.urlopen(HEALTH_CHECK_URL) is the problem. The following are the url:error_message pairs.
+
+HTTP Error 500: INTERNAL SERVER ERROR from "http ://localhost:4567/api/health-check"
+HTTP Error 404: Not Foun from "https: //4567-... .gitpod.io/api/health-check"
+
+The whole point of running a health check is to verify whether the server is running and if the api routing is working. If you are getting the classic 500 internal server error and 404 not found error, it is most likely there is a problem with the routing.
+
+1) In my case, the cause of the problem was that I forgot to add the health check route to my flask’s app.py.
+# add the route for health check in app.py
+@app.route('api/health-check')
+def health_check():
+  return {'success': True}, 200
+
+**Issue3**
+  An error occurred (InvalidParameterException) 
+    when calling the CreateService operation: 
+    The target group with targetGroupArn  # Launching the backend container failed all of a sudden.
+    arn:aws:elasticloadbalancing:REGION:AWS_ACCOUNT_ID:targetgroup/cruddur-backend-flask-tg/da...
+    does not have an associated load balancer. 
+
+    It turns out, I missed adding a rule that routes api.domain.com to the backend-flask target group.
+Solution
+You have to add “a rule that forwards api. traffic to the backend” to the HTTPS:443 listener in your Application Load Balancer.
+Compare the following listener settings, with an extra attention to the Default action and Rules rules columns.
+
+**Issue4**
+WORKDIR /frontend-react-js  
+COPY . ./frontend-react-js   <----- this line must precede WORKDIR
+RUN npm install
+RUN npm run build
+
+The docker command WORKDIR only “defines” the working directory, instead of “creating” one.
+— COPY does create a directory.
+— Hence, COPY first then WORKDIR.
+# Dockerfile.prod
+...
+
+COPY . ./frontend-react-js   <--- Switch the order.
+WORKDIR /frontend-react-js   <--- 
+
+**Issue5**
