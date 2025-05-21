@@ -5,7 +5,9 @@ https://medium.com/@gwenleigh
 https://medium.com/@gwenleigh/week-6-fargate-troubleshooting-frontend-health-check-3-aws-ecs-internal-check-8cfe0997120a
 https://medium.com/@gwenleigh/week-6-ecs-fargate-atlas-of-errors-507302d4fff8 - good
 https://medium.com/@gwenleigh/week-7-troubleshoot-fargate-containers-keep-deregistering-633ca1b34b03
-https://medium.com/@sharma.naman/common-ecs-issues-and-their-solutions-c031f00e0283
+
+https://medium.com/@sharma.naman/common-ecs-issues-and-their-solutions-c031f00e0283 - good
+
 https://mihirpopat.medium.com/mastering-aws-ecs-scenario-based-questions-you-must-know-f999cb000551
 
 # ECS (Elastic Container Service) Interview Questions and Answers
