@@ -5,3 +5,7 @@ https://medium.com/@gwenleigh/week-6-fargate-troubleshooting-frontend-health-che
 DR- DR- https://yegortokmakov.medium.com/cross-region-disaster-recovery-with-amazon-elastic-container-service-782bcd007102
 https://aws.plainenglish.io/multi-region-dr-for-ecs-fargate-a-practical-guide-0b59a9893bdb
 
+
+**Capacity Providers**
+https://medium.com/@thakkarkinjal2000/aws-ecs-fargate-vs-fargate-spot-cost-optimization-task-provisioning-insights-5e0711a91c97
+
